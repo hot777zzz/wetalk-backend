@@ -4,69 +4,46 @@ import {
   // Delete,
   Get,
   Post,
+  Query,
 } from '@nestjs/common';
-import { CreateUserDTO } from './user.dto';
-import { User } from './user.interface';
+import { CreateUserDTO, EditUserDTO } from './user.dto/user.dto';
+import { User } from './user.dto/user.interface';
 import { UserService } from './user.service';
-interface UserResponse<T = unknown> {
-  //这是一个 TypeScript 接口定义，用于描述用户响应的数据结构。它包含一个泛型参数 T，默认值为 unknown，其中包含 code（响应码）、data（响应数据，可选）和 message（响应消息）三个属性。
-  code: number;
-  data?: T;
-  message: string;
-}
+
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
   // GET /user/users
   @Get('/users')
-  async findAll(): Promise<UserResponse<User[]>> {
-    return {
-      code: 200,
-      data: await this.userService.findAll(),
-      message: '查询成功.',
-    };
+  async findAll(): Promise<User[]> {
+    return await this.userService.findAll();
   }
-  // GET /user/:_id
-  @Post('/find_one')
-  async findOne(
-    @Body() userData: { user_name: string },
-  ): Promise<UserResponse> {
-    await this.userService.findOne(userData.user_name); // 使用传入的 user_name 参数
-    return {
-      code: 200,
-      data: await this.userService.findOne(userData.user_name),
-      message: '查询成功.',
-    };
+
+  // GET /user/findOne
+  @Get('/findOne')
+  async findOne(@Query('user_name') userName: string): Promise<User> {
+    return await this.userService.findOne(userName);
   }
-  // POST /user/user
-  @Post('/user')
-  async addOne(@Body() body: CreateUserDTO): Promise<UserResponse> {
-    await this.userService.addOne(body);
-    return {
-      code: 200,
-      message: '添加成功.',
-    };
+
+  // POST /user/create
+  @Post('/create')
+  async addOne(@Body() body: CreateUserDTO): Promise<User> {
+    return await this.userService.addOne(body);
   }
-  // PUT /user/:_id
+
+  // POST /user/upd
   @Post('/upd')
-  async updateOne(
-    @Body() userData: { user_name: string; newPassword: string },
-  ): Promise<UserResponse> {
-    await this.userService.updateOne(userData.user_name, userData.newPassword); // 使用传入的 user_name 参数
-    return {
-      code: 200,
-      message: '修改成功.',
-    };
+  async updateOne(@Body() body: EditUserDTO): Promise<User> {
+    return await this.userService.updateOne(body);
   }
-  // Post /user/deluser
-  @Post('/deluser1')
+
+  // POST /user/del
+  @Post('/del')
   async deleteOne(
     @Body() userData: { user_name: string },
-  ): Promise<UserResponse> {
-    await this.userService.deleteOne(userData.user_name); // 使用传入的 user_name 参数
-    return {
-      code: 200,
-      message: '删除成功.',
-    };
+  ): Promise<{ deleted: boolean }> {
+    await this.userService.deleteOne(userData.user_name);
+    return { deleted: true };
   }
 }
