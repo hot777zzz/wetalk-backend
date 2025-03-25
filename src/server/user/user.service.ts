@@ -37,7 +37,6 @@ export class UserService {
         // 创建一个新对象而不是修改原对象
         const newUserData = {
           ...userData,
-          password: bcryptjs.hashSync(userData.password, 10),
         };
 
         // 创建并返回新用户

@@ -36,10 +36,4 @@ export class AuthController {
       resetPasswordDto.newPassword,
     );
   }
-
-  @Public()
-  @Post('temp-login')
-  async tempLogin(@Body() loginDto: LoginDto) {
-    return this.authService.tempLogin(loginDto);
-  }
 }
