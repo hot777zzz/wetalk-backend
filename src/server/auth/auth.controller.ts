@@ -5,6 +5,7 @@ import { CreateUserDTO } from '../user/user.dto/user.dto';
 import { Public } from './constants';
 import { UserService } from '../user/user.service';
 import { JwtService } from '@nestjs/jwt';
+import { Req, Request } from '@nestjs/common';
 
 @Controller('auth')
 export class AuthController {
@@ -26,14 +27,26 @@ export class AuthController {
     return this.authService.register(createUserDto);
   }
 
-  @Public()
   @Post('reset-password')
   async resetPassword(
-    @Body() resetPasswordDto: { username: string; newPassword: string },
+    @Body() resetPasswordDto: { newPassword: string },
+    @Req() request: Request,
   ) {
-    return this.authService.resetPassword(
-      resetPasswordDto.username,
-      resetPasswordDto.newPassword,
-    );
+    const token = request.headers['authorization']?.toString().split(' ')[1];
+    if (!token) {
+      throw new UnauthorizedException('未提供令牌');
+    }
+
+    try {
+      const payload = this.jwtService.verify(token);
+      const username: string = payload.username;
+
+      return this.authService.resetPassword(
+        username,
+        resetPasswordDto.newPassword,
+      );
+    } catch (error) {
+      throw new UnauthorizedException('无效的令牌');
+    }
   }
 }

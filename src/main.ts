@@ -6,6 +6,11 @@ import { HttpExceptionFilter } from './filters/http-execption.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalInterceptors(new TransformInterceptor());
+  app.enableCors({
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  });
   app.useGlobalFilters(new HttpExceptionFilter());
   app.setGlobalPrefix('api');
   await app.listen(process.env.PORT ?? 3000);

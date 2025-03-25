@@ -6,9 +6,8 @@ import { UserModule } from './server/user/user.module';
 import { AuthModule } from './server/auth/auth.module';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-
+import { EventGateway } from './gateway/event.gateway';
 @Module({
-  // 填写本地的数据库路径
   imports: [
     MongooseModule.forRoot('mongodb://localhost:27017/mongodb'),
     UserModule,
@@ -21,6 +20,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
     },
+    EventGateway,
   ],
 })
 export class AppModule {}
