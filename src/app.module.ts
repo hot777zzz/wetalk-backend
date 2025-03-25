@@ -6,12 +6,14 @@ import { UserModule } from './server/user/user.module';
 import { AuthModule } from './server/auth/auth.module';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { EventGateway } from './gateway/event.gateway';
+import { GatewayModule } from './gateway/gateway.module';
+
 @Module({
   imports: [
     MongooseModule.forRoot('mongodb://localhost:27017/mongodb'),
     UserModule,
     AuthModule,
+    GatewayModule,
   ],
   controllers: [AppController],
   providers: [
@@ -20,7 +22,6 @@ import { EventGateway } from './gateway/event.gateway';
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
     },
-    EventGateway,
   ],
 })
 export class AppModule {}

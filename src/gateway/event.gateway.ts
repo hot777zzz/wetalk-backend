@@ -10,6 +10,8 @@ import {
 } from '@nestjs/websockets';
 import { Socket, Server } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { UserService } from '../server/user/user.service';
+import { JwtService } from '@nestjs/jwt';
 
 // 定义消息接口
 interface ChatMessage {
@@ -34,6 +36,11 @@ export class EventGateway
   private logger = new Logger('EventGateway');
   private userSocketMap = new Map<string, string>(); // 用户ID -> socketId
 
+  constructor(
+    private readonly userService: UserService,
+    private readonly jwtService: JwtService,
+  ) {}
+
   // 初始化完成后的钩子
   afterInit(server: Server) {
     this.logger.log('WebSocket 服务器初始化完成');
@@ -57,16 +64,42 @@ export class EventGateway
     }
   }
 
-  // 用户注册身份
+  // 使用JWT验证
   @SubscribeMessage('register')
-  handleRegister(
-    @MessageBody() data: { userId: string },
+  async handleRegister(
+    @MessageBody() data: { token: string },
     @ConnectedSocket() client: Socket,
   ) {
-    const { userId } = data;
-    this.userSocketMap.set(userId, client.id);
-    this.logger.log(`用户 ${userId} 已注册，Socket ID: ${client.id}`);
-    return { status: 'success', message: '注册成功' };
+    try {
+      const { token } = data;
+      if (!token) {
+        return { status: 'error', message: '缺少令牌' };
+      }
+
+      // 验证JWT令牌
+      const payload = this.jwtService.verify(token);
+      const userId = payload.sub;
+      const username = payload.username;
+
+      // 验证用户是否存在
+      await this.userService.findOne(username);
+
+      // 注册用户与Socket的映射
+      this.userSocketMap.set(userId, client.id);
+      this.logger.log(
+        `用户 ${username}(${userId}) 已注册，Socket ID: ${client.id}`,
+      );
+
+      return {
+        status: 'success',
+        message: '注册成功',
+        userId,
+        username,
+      };
+    } catch (error) {
+      this.logger.error(`用户注册失败: ${error.message}`);
+      return { status: 'error', message: '身份验证失败' };
+    }
   }
 
   // 发送公共消息（广播）
