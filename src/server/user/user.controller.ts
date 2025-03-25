@@ -5,10 +5,12 @@ import {
   Get,
   Post,
   Query,
+  Request,
 } from '@nestjs/common';
 import { CreateUserDTO, EditUserDTO } from './user.dto/user.dto';
 import { User } from './user.dto/user.interface';
 import { UserService } from './user.service';
+import { Public } from '../auth/constants';
 
 @Controller('user')
 export class UserController {
@@ -26,10 +28,10 @@ export class UserController {
     return await this.userService.findOne(userName);
   }
 
-  // POST /user/create
-  @Post('/create')
-  async addOne(@Body() body: CreateUserDTO): Promise<User> {
-    return await this.userService.addOne(body);
+  // GET /user/profile - 获取当前登录用户信息
+  @Get('/profile')
+  async getProfile(@Request() req): Promise<User> {
+    return await this.userService.findOne(req.user.username);
   }
 
   // POST /user/upd
