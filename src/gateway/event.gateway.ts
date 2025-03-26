@@ -11,7 +11,9 @@ import {
 import { Socket, Server } from 'socket.io';
 import { Logger } from '@nestjs/common';
 import { UserService } from '../server/user/user.service';
+import { MessageService } from '../server/message/message.service';
 import { JwtService } from '@nestjs/jwt';
+import { Message } from '../server/message/message.dto/message.interface';
 
 // 定义消息接口
 interface ChatMessage {
@@ -38,6 +40,7 @@ export class EventGateway
 
   constructor(
     private readonly userService: UserService,
+    private readonly messageService: MessageService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -102,28 +105,9 @@ export class EventGateway
     }
   }
 
-  // 发送公共消息（广播）
-  @SubscribeMessage('sendPublicMessage')
-  handlePublicMessage(
-    @MessageBody() message: ChatMessage,
-    @ConnectedSocket() client: Socket,
-  ) {
-    this.logger.log(`收到公共消息: ${JSON.stringify(message)}`);
-
-    // 添加时间戳（如果没有）
-    if (!message.timestamp) {
-      message.timestamp = new Date();
-    }
-
-    // 广播消息给所有客户端
-    this.server.emit('publicMessage', message);
-
-    return { status: 'success', message: '消息发送成功' };
-  }
-
   // 发送私聊消息
   @SubscribeMessage('sendPrivateMessage')
-  handlePrivateMessage(
+  async handlePrivateMessage(
     @MessageBody() message: ChatMessage,
     @ConnectedSocket() client: Socket,
   ) {
@@ -138,6 +122,19 @@ export class EventGateway
       message.timestamp = new Date();
     }
 
+    // 保存消息到数据库
+    try {
+      await this.messageService.createMessage({
+        content: message.content,
+        sender: message.sender,
+        receiver: message.receiver,
+        messageType: 'private',
+        createdAt: message.timestamp,
+      });
+    } catch (error) {
+      this.logger.error(`保存私聊消息失败: ${error.message}`);
+    }
+
     // 获取接收者的 socket ID
     const receiverSocketId = this.userSocketMap.get(message.receiver);
 
@@ -148,37 +145,14 @@ export class EventGateway
       client.emit('privateMessage', message);
       return { status: 'success', message: '私聊消息发送成功' };
     } else {
-      return { status: 'error', message: '接收者不在线' };
+      // 用户不在线，但仍保存消息
+      return { status: 'warning', message: '接收者不在线，消息已保存' };
     }
-  }
-
-  // 加入聊天室
-  @SubscribeMessage('joinRoom')
-  handleJoinRoom(
-    @MessageBody() data: { roomId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    const { roomId } = data;
-    client.join(roomId);
-    this.logger.log(`客户端 ${client.id} 加入房间 ${roomId}`);
-    return { status: 'success', message: `已加入房间 ${roomId}` };
-  }
-
-  // 离开聊天室
-  @SubscribeMessage('leaveRoom')
-  handleLeaveRoom(
-    @MessageBody() data: { roomId: string },
-    @ConnectedSocket() client: Socket,
-  ) {
-    const { roomId } = data;
-    client.leave(roomId);
-    this.logger.log(`客户端 ${client.id} 离开房间 ${roomId}`);
-    return { status: 'success', message: `已离开房间 ${roomId}` };
   }
 
   // 发送房间消息
   @SubscribeMessage('sendRoomMessage')
-  handleRoomMessage(
+  async handleRoomMessage(
     @MessageBody() message: ChatMessage,
     @ConnectedSocket() client: Socket,
   ) {
@@ -193,10 +167,77 @@ export class EventGateway
       message.timestamp = new Date();
     }
 
+    // 保存消息到数据库
+    try {
+      await this.messageService.createMessage({
+        content: message.content,
+        sender: message.sender,
+        roomId: message.roomId,
+        messageType: 'room',
+        createdAt: message.timestamp,
+      });
+    } catch (error) {
+      this.logger.error(`保存房间消息失败: ${error.message}`);
+    }
+
     // 发送消息给房间内所有人
     this.server.to(message.roomId).emit('roomMessage', message);
 
     return { status: 'success', message: '房间消息发送成功' };
+  }
+
+  // 获取历史消息
+  @SubscribeMessage('getMessageHistory')
+  async handleGetMessageHistory(
+    @MessageBody()
+    data: {
+      type: 'private' | 'room' | 'public';
+      roomId?: string;
+      otherUserId?: string;
+      limit?: number;
+      skip?: number;
+    },
+  ) {
+    try {
+      let messages: Message[] = [];
+
+      switch (data.type) {
+        case 'private':
+          if (!data.otherUserId) {
+            return { status: 'error', message: '缺少对方用户ID' };
+          }
+          messages = await this.messageService.getPrivateMessages(
+            data.otherUserId,
+            data.otherUserId,
+            data.limit,
+            data.skip,
+          );
+          break;
+
+        case 'room':
+          if (!data.roomId) {
+            return { status: 'error', message: '缺少房间ID' };
+          }
+          messages = await this.messageService.getRoomMessages(
+            data.roomId,
+            data.limit,
+            data.skip,
+          );
+          break;
+
+        default:
+          return { status: 'error', message: '不支持的消息类型' };
+      }
+
+      return {
+        status: 'success',
+        data: messages,
+        message: '获取历史消息成功',
+      };
+    } catch (error) {
+      this.logger.error(`获取历史消息失败: ${error.message}`);
+      return { status: 'error', message: '获取历史消息失败' };
+    }
   }
 
   // 获取在线用户列表
