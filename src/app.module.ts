@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './server/user/user.module';
 import { AuthModule } from './server/auth/auth.module';
 import { MessageModule } from './server/message/message.module';
+import { GroupModule } from './server/group/group.module';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { EventGateway } from './gateway/event.gateway';
@@ -15,6 +16,7 @@ import { EventGateway } from './gateway/event.gateway';
     UserModule,
     AuthModule,
     MessageModule,
+    GroupModule,
   ],
   controllers: [AppController],
   providers: [

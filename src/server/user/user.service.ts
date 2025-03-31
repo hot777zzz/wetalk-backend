@@ -9,9 +9,12 @@ import { CreateUserDTO, EditUserDTO } from './user.dto/user.dto';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcryptjs from 'bcryptjs';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(@InjectModel('User') private readonly userModel: Model<User>) {}
 
   async findAll(): Promise<User[]> {
@@ -98,5 +101,17 @@ export class UserService {
     }
 
     return { success: true };
+  }
+
+  // 添加按ID查找用户的方法
+  async findById(userId: string): Promise<User | null> {
+    try {
+      return await this.userModel.findById(userId).exec();
+    } catch (error: unknown) {
+      this.logger.error(
+        `按ID查找用户失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+      return null;
+    }
   }
 }
