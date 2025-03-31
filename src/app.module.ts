@@ -7,7 +7,7 @@ import { AuthModule } from './server/auth/auth.module';
 import { MessageModule } from './server/message/message.module';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { GatewayModule } from './gateway/gateway.module';
+import { EventGateway } from './gateway/event.gateway';
 
 @Module({
   imports: [
@@ -15,7 +15,6 @@ import { GatewayModule } from './gateway/gateway.module';
     UserModule,
     AuthModule,
     MessageModule,
-    GatewayModule,
   ],
   controllers: [AppController],
   providers: [
@@ -24,6 +23,7 @@ import { GatewayModule } from './gateway/gateway.module';
       provide: APP_FILTER,
       useClass: HttpExceptionFilter,
     },
+    EventGateway,
   ],
 })
 export class AppModule {}
