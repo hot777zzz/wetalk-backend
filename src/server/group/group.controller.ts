@@ -7,15 +7,10 @@ import {
   Put,
   Delete,
   Request,
-  Query,
 } from '@nestjs/common';
 import { GroupService } from './group.service';
 
-import {
-  CreateGroupDto,
-  UpdateGroupDto,
-  AddMemberDto,
-} from './group.dto/group.dto';
+import { CreateGroupDto, AddMemberDto } from './group.dto/group.dto';
 import { Public } from '../auth/constants';
 
 // 请求类型定义

@@ -12,7 +12,6 @@ import { JwtService } from '@nestjs/jwt';
 import { Injectable, Logger } from '@nestjs/common';
 import { UserService } from '../server/user/user.service';
 import { MessageService } from '../server/message/message.service';
-import { Message } from '../server/message/message.dto/message.interface';
 
 interface ChatMessage {
   content: string;
