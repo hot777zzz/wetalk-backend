@@ -193,18 +193,6 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
           isGroup: true,
         });
       }
-      // 处理公共聊天室消息
-      else {
-        // 保存公共消息到数据库 (使用现有的createMessage方法)
-        await this.messageService.createMessage({
-          content: data.content,
-          sender: sender,
-          messageType: 'room',
-        });
-
-        // 广播给所有连接的客户端
-        this.server.emit('receive_message', message);
-      }
     } catch (error) {
       this.logger.error(`消息处理错误: ${error.message}`);
       client.emit('error', { message: '消息发送失败' });
