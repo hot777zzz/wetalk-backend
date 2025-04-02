@@ -3,14 +3,12 @@ import {
   Get,
   Query,
   Param,
-  UseGuards,
   Request,
   Delete,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { MessageService } from './message.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GetMessageQueryDto } from './message.dto/message.dto';
 
 @Controller('messages')
