@@ -9,6 +9,7 @@ import { GroupModule } from './server/group/group.module';
 import { APP_FILTER } from '@nestjs/core';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { EventGateway } from './gateway/event.gateway';
+import { FriendModule } from './server/friend/friend.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { EventGateway } from './gateway/event.gateway';
     AuthModule,
     MessageModule,
     GroupModule,
+    FriendModule,
   ],
   controllers: [AppController],
   providers: [

@@ -6,6 +6,7 @@ export interface Group extends Document {
   readonly owner: string; // 群主ID
   readonly members: string[]; // 成员ID列表
   readonly avatar: string; // 群头像
+  readonly groupId: string; // 添加groupId字段
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

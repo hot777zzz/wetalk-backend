@@ -6,6 +6,7 @@ export const groupSchema = new Schema({
   owner: { type: String, required: true }, // 群主ID
   members: { type: [String], default: [] }, // 成员ID列表
   avatar: { type: String, default: '' }, // 群头像
+  groupId: { type: String, required: true, unique: true }, // 添加groupId字段，并设置为必填和唯一
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

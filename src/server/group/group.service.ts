@@ -8,7 +8,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Group } from './group.dto/group.interface';
-import { CreateGroupDto, UpdateGroupDto } from './group.dto/group.dto';
+import { CreateGroupDto } from './group.dto/group.dto';
 import { UserService } from '../user/user.service';
 import {
   MemberInfoDto,
@@ -27,7 +27,16 @@ export class GroupService {
   // 创建新群组
   async createGroup(createGroupDto: CreateGroupDto): Promise<Group> {
     try {
-      const newGroup = new this.groupModel(createGroupDto);
+      // 生成唯一的groupId
+      const groupId = new Date().getTime().toString();
+
+      // 将groupId添加到DTO中
+      const groupWithId = {
+        ...createGroupDto,
+        groupId: groupId,
+      };
+
+      const newGroup = new this.groupModel(groupWithId);
 
       // 确保创建者也是成员
       if (!newGroup.members.includes(createGroupDto.owner)) {

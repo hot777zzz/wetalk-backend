@@ -33,6 +33,10 @@ export class GroupController {
   ) {
     // 确保当前用户是创建者
     createGroupDto.owner = req.user.userId;
+
+    // 添加唯一的groupId
+    createGroupDto['groupId'] = new Date().getTime().toString();
+
     return this.groupService.createGroup(createGroupDto);
   }
 

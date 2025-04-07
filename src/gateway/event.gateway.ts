@@ -9,10 +9,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { UserService } from '../server/user/user.service';
 import { MessageService } from '../server/message/message.service';
 import { GroupService } from '../server/group/group.service';
+import { FriendService } from '../server/friend/friend.service';
 
 // 添加JWT载荷接口定义
 interface JwtPayload {
@@ -26,6 +27,15 @@ interface ChatMessage {
   receiver?: string;
   groupId?: string;
   time: string;
+}
+
+// 添加好友请求接口定义
+interface FriendRequest {
+  _id: string;
+  sender: string;
+  receiver: string;
+  status: string;
+  senderInfo?: any;
 }
 
 @Injectable()
@@ -49,7 +59,64 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private userService: UserService,
     private messageService: MessageService,
     private groupService: GroupService,
+    // 注入FriendService
+    @Inject(forwardRef(() => FriendService))
+    private friendService: FriendService,
   ) {}
+
+  // 将这三个方法移到类的顶层
+  // 通知好友请求
+  notifyFriendRequest(receiverId: string, request: FriendRequest): void {
+    try {
+      const receiverSocketId = this.userSocketMap.get(receiverId);
+      if (receiverSocketId) {
+        this.server.to(`user:${receiverId}`).emit('friend_request', request);
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `发送好友请求通知失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+    }
+  }
+
+  // 通知好友请求状态更新
+  notifyFriendRequestUpdate(senderId: string, request: FriendRequest): void {
+    try {
+      const senderSocketId = this.userSocketMap.get(senderId);
+      if (senderSocketId) {
+        this.server
+          .to(`user:${senderId}`)
+          .emit('friend_request_update', request);
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `发送好友请求状态更新通知失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+    }
+  }
+
+  // 通知好友在线状态变化
+  async notifyFriendStatus(userId: string, status: 'online' | 'offline') {
+    try {
+      // 获取该用户的所有好友
+      const friends = await this.friendService.getFriendsList(userId);
+
+      // 向所有好友发送状态更新
+      for (const friend of friends) {
+        const friendSocketId = this.userSocketMap.get(friend.user_name);
+        if (friendSocketId) {
+          this.server.to(`user:${friend.user_name}`).emit('friend_status', {
+            friendId: userId,
+            status: status,
+          });
+        }
+      }
+    } catch (error: unknown) {
+      this.logger.error(
+        `发送好友状态更新通知失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+    }
+  }
 
   async handleConnection(client: Socket) {
     try {
@@ -95,9 +162,11 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // 将用户加入所有群组的房间
       for (const group of userGroups) {
-        client.join(`group:${group._id.toString()}`);
+        client.join(
+          `group:${typeof group._id === 'object' && group._id?.toString ? group._id.toString() : group._id}`,
+        );
         this.logger.debug(
-          `用户 ${username} 加入群组房间: ${group.name} (${group._id})`,
+          `用户 ${username} 加入群组房间: ${group.name} (${typeof group._id === 'object' && group._id?.toString ? group._id.toString() : group._id})`,
         );
       }
 
@@ -114,6 +183,9 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         username: username,
         status: 'online',
       });
+
+      // 通知好友该用户上线
+      this.notifyFriendStatus(username, 'online');
     } catch (error: unknown) {
       this.logger.error(
         `连接处理错误: ${error instanceof Error ? error.message : '未知错误'}`,
@@ -138,6 +210,9 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
           username: username,
           status: 'offline',
         });
+
+        // 通知好友该用户下线
+        this.notifyFriendStatus(username, 'offline');
       }
     } catch (error: unknown) {
       this.logger.error(
@@ -220,7 +295,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // 群组相关事件通知函数
   // 这个方法供内部使用，通知群组成员变化
-  async notifyGroupMemberChange(groupId: string, data: any, event: string) {
+  notifyGroupMemberChange(groupId: string, data: any, event: string): void {
     try {
       this.server.to(`group:${groupId}`).emit(event, data);
     } catch (error: unknown) {
@@ -247,7 +322,11 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const socketRooms = [...client.rooms].filter((room) =>
         room.startsWith('group:'),
       );
-      socketRooms.forEach((room) => client.leave(room));
+
+      // 使用 for...of 循环替代 forEach 来避免异步问题
+      for (const room of socketRooms) {
+        client.leave(room);
+      }
 
       // 重新获取并加入所有群组
       const userGroups = await this.groupService.findUserGroups(
@@ -256,13 +335,18 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // 将用户加入所有群组的房间
       for (const group of userGroups) {
-        client.join(`group:${group._id.toString()}`);
+        client.join(
+          `group:${typeof group._id === 'object' && group._id?.toString ? group._id.toString() : group._id}`,
+        );
       }
 
       client.emit('groups_reloaded', {
         count: userGroups.length,
         groups: userGroups.map((g) => ({
-          id: g._id.toString(),
+          id:
+            typeof g._id === 'object' && g._id?.toString
+              ? g._id.toString()
+              : String(g._id),
           name: g.name,
         })),
       });
