@@ -180,6 +180,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       // 广播用户上线状态
       this.server.emit('user_status', {
+        userid: user._id,
         username: username,
         status: 'online',
       });

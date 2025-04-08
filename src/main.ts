@@ -8,11 +8,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
   app.enableCors({
     origin: '*',
-    methods: ['GET', 'POST'],
     credentials: true,
   });
   app.useGlobalFilters(new HttpExceptionFilter());
-
   app.setGlobalPrefix('api');
   await app.listen(process.env.PORT ?? 3000);
 }
