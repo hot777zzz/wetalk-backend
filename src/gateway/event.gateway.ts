@@ -234,11 +234,11 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         client.emit('error', { message: '未授权的消息' });
         return;
       }
-
+      console.log('发送消息', data);
       // 构建消息对象
       const message = {
         content: data.content,
-        sender: sender,
+        sender: data.sender,
         time: new Date().toISOString(),
       };
 
@@ -249,7 +249,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // 保存私聊消息到数据库
         await this.messageService.createMessage({
           content: data.content,
-          sender: sender,
+          sender: data.sender,
           receiver: data.receiver,
           messageType: 'private',
         });
@@ -274,7 +274,7 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         // 保存群聊消息到数据库
         await this.messageService.createMessage({
           content: data.content,
-          sender: sender,
+          sender: data.sender,
           roomId: data.groupId,
           messageType: 'room',
         });
