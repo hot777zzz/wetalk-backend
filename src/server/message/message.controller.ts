@@ -55,17 +55,17 @@ export class MessageController {
     return { messages };
   }
 
-  // 获取房间消息历史
-  @Get('room/:roomId')
-  async getRoomMessages(
+  // 获取群组消息历史
+  @Get('group/:groupId')
+  async getGroupMessages(
     @Request() req,
-    @Param('roomId') roomId: string,
+    @Param('groupId') groupId: string,
     @Query('limit') limit?: number,
     @Query('skip') skip?: number,
   ) {
     const userId = req.user.userId;
-    const messages = await this.messageService.getRoomMessages(
-      roomId,
+    const messages = await this.messageService.getGroupMessages(
+      groupId,
       limit ? parseInt(limit.toString()) : 50,
       skip ? parseInt(skip.toString()) : 0,
       userId, // 传入用户ID以便标记已读
@@ -78,13 +78,13 @@ export class MessageController {
   async getUnreadCount(
     @Request() req,
     @Query('otherUserId') otherUserId?: string,
-    @Query('roomId') roomId?: string,
+    @Query('groupId') groupId?: string,
   ) {
     const userId = req.user.userId;
     const count = await this.messageService.getUnreadCount(
       userId,
       otherUserId,
-      roomId,
+      groupId,
     );
     return { count };
   }
@@ -103,13 +103,13 @@ export class MessageController {
   async markConversationAsRead(
     @Request() req,
     @Query('otherUserId') otherUserId?: string,
-    @Query('roomId') roomId?: string,
+    @Query('groupId') groupId?: string,
   ) {
     const userId = req.user.userId;
     const count = await this.messageService.markConversationAsRead(
       userId,
       otherUserId,
-      roomId,
+      groupId,
     );
     return { count };
   }

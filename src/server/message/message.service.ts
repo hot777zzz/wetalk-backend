@@ -129,9 +129,9 @@ export class MessageService {
     }
   }
 
-  // 获取房间消息历史
-  async getRoomMessages(
-    roomId: string,
+  // 获取群组消息历史
+  async getGroupMessages(
+    groupId: string,
     limit = 50,
     skip = 0,
     userId?: string, // 可选参数，用于标记某个用户的未读消息
@@ -139,8 +139,8 @@ export class MessageService {
     try {
       const messages = await this.messageModel
         .find({
-          roomId,
-          messageType: 'room',
+          groupId,
+          messageType: 'group',
           isDeleted: { $ne: true }, // 排除已删除消息
         })
         .sort({ createdAt: -1 })
