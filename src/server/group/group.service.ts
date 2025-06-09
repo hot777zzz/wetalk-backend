@@ -6,8 +6,8 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Group } from './group.dto/group.interface';
+import { Model, Types } from 'mongoose';
+import { Group, GroupData } from './group.dto/group.interface';
 import { CreateGroupDto } from './group.dto/group.dto';
 import { UserService } from '../user/user.service';
 import {
@@ -23,6 +23,42 @@ export class GroupService {
     @InjectModel('Group') private readonly groupModel: Model<Group>,
     private readonly userService: UserService,
   ) {}
+
+  // 根据ID查找群组
+  async findGroupById(groupId: string): Promise<Group | null> {
+    try {
+      if (!Types.ObjectId.isValid(groupId)) {
+        return null;
+      }
+      return await this.groupModel.findById(new Types.ObjectId(groupId)).exec();
+    } catch (error: unknown) {
+      this.logger.error(
+        `查找群组失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+      return null;
+    }
+  }
+
+  // 检查用户是否在群组中
+  async isUserInGroup(userId: string, groupId: string): Promise<boolean> {
+    try {
+      if (!Types.ObjectId.isValid(groupId)) {
+        return false;
+      }
+      const group = await this.groupModel
+        .findOne({
+          _id: new Types.ObjectId(groupId),
+          members: userId,
+        })
+        .exec();
+      return !!group;
+    } catch (error: unknown) {
+      this.logger.error(
+        `检查用户群组成员身份失败: ${error instanceof Error ? error.message : '未知错误'}`,
+      );
+      return false;
+    }
+  }
 
   // 创建新群组
   async createGroup(createGroupDto: CreateGroupDto): Promise<Group> {
@@ -81,13 +117,19 @@ export class GroupService {
   }
 
   // 获取用户的所有群组
-  async findUserGroups(userId: string): Promise<Group[]> {
+  async findUserGroups(userId: string): Promise<GroupData[]> {
     try {
-      return await this.groupModel
+      const groups = await this.groupModel
         .find({
           members: userId,
         })
+        .lean()
         .exec();
+
+      return groups.map((group) => ({
+        ...group,
+        _id: group._id as Types.ObjectId,
+      }));
     } catch (error: unknown) {
       this.logger.error(
         `获取用户群组失败: ${error instanceof Error ? error.message : '未知错误'}`,

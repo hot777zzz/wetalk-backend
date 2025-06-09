@@ -130,63 +130,61 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       // 验证token
-      const payload = this.jwtService.verify(token) as JwtPayload;
-      const username = payload.username;
+      const payload = this.jwtService.verify(token);
+      const userId = payload.sub; // 使用sub作为userId
 
-      if (!username) {
+      if (!userId) {
         this.logger.warn(`无效的token: ${client.id}`);
         client.disconnect();
         return;
       }
 
       // 检查用户是否存在
-      const user = await this.userService.findOne(username);
+      const user = await this.userService.findById(userId);
 
       if (!user) {
-        this.logger.warn(`用户不存在: ${username}`);
+        this.logger.warn(`用户不存在: ${userId}`);
         client.disconnect();
         return;
       }
 
       // 将用户与socket关联
-      this.userSocketMap.set(username, client.id);
-      this.socketUserMap.set(client.id, username);
+      this.userSocketMap.set(userId, client.id);
+      this.socketUserMap.set(client.id, userId);
 
       // 加入个人房间
-      client.join(`user:${username}`);
+      client.join(`user:${userId}`);
 
-      // 加入用户所在的群组 - 直接从数据库查询并加入
-      const userGroups = await this.groupService.findUserGroups(
-        user._id.toString(),
-      );
+      // 加入用户所在的群组
+      const userGroups = await this.groupService.findUserGroups(userId);
 
       // 将用户加入所有群组的房间
       for (const group of userGroups) {
-        client.join(
-          `group:${typeof group._id === 'object' && group._id?.toString ? group._id.toString() : group._id}`,
-        );
+        const groupId = group._id.toString();
+        client.join(`group:${groupId}`);
         this.logger.debug(
-          `用户 ${username} 加入群组房间: ${group.name} (${typeof group._id === 'object' && group._id?.toString ? group._id.toString() : group._id})`,
+          `用户 ${userId} 加入群组房间: ${group.name} (${groupId})`,
         );
       }
 
-      this.logger.log(`用户已连接: ${username} (${client.id})`);
+      this.logger.log(`用户已连接: ${userId} (${client.id})`);
 
       // 通知用户连接成功
-      client.emit('connection_success', {
+      client.emit('connection_success2', {
         message: '连接成功',
-        username: username,
+        userId: userId,
+        username: user.user_name,
       });
 
       // 广播用户上线状态
       this.server.emit('user_status', {
-        userid: user._id,
-        username: username,
+        userId: userId,
+        username: user.user_name,
         status: 'online',
       });
 
       // 通知好友该用户上线
-      this.notifyFriendStatus(username, 'online');
+      this.notifyFriendStatus(userId, 'online');
     } catch (error: unknown) {
       this.logger.error(
         `连接处理错误: ${error instanceof Error ? error.message : '未知错误'}`,
@@ -235,16 +233,31 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         return;
       }
       console.log('发送消息', data);
+
+      // 获取发送者信息
+      const senderUser = await this.userService.findById(data.sender);
+      if (!senderUser) {
+        client.emit('error', { message: '发送者信息不存在' });
+        return;
+      }
+
       // 构建消息对象
       const message = {
         content: data.content,
         sender: data.sender,
+        senderName: senderUser.user_name,
+        senderAvatar: senderUser.avatar || 'U',
         time: new Date().toISOString(),
       };
 
       // 处理私聊消息
       if (data.receiver) {
-        const receiverSocketId = this.userSocketMap.get(data.receiver);
+        // 检查接收者是否存在
+        const receiverUser = await this.userService.findById(data.receiver);
+        if (!receiverUser) {
+          client.emit('error', { message: '接收者不存在' });
+          return;
+        }
 
         // 保存私聊消息到数据库
         await this.messageService.createMessage({
@@ -255,12 +268,10 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
         });
 
         // 发送给接收者
-        if (receiverSocketId) {
-          this.server.to(`user:${data.receiver}`).emit('receive_message', {
-            ...message,
-            isPrivate: true,
-          });
-        }
+        this.server.to(`user:${data.receiver}`).emit('receive_message', {
+          ...message,
+          isPrivate: true,
+        });
 
         // 发送给发送者确认
         client.emit('message_sent', {
@@ -268,9 +279,28 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
           receiver: data.receiver,
           isPrivate: true,
         });
+
+        this.logger.debug(`私聊消息已发送: ${sender} -> ${data.receiver}`);
       }
       // 处理群聊消息
       else if (data.groupId) {
+        // 检查群组是否存在
+        const group = await this.groupService.findGroupById(data.groupId);
+        if (!group) {
+          client.emit('error', { message: '群组不存在' });
+          return;
+        }
+
+        // 检查发送者是否在群组中
+        const isMember = await this.groupService.isUserInGroup(
+          data.sender,
+          data.groupId,
+        );
+        if (!isMember) {
+          client.emit('error', { message: '您不是该群组成员' });
+          return;
+        }
+
         // 保存群聊消息到数据库
         await this.messageService.createMessage({
           content: data.content,
@@ -285,6 +315,15 @@ export class EventGateway implements OnGatewayConnection, OnGatewayDisconnect {
           groupId: data.groupId,
           isGroup: true,
         });
+
+        // 发送给发送者确认
+        client.emit('message_sent', {
+          ...message,
+          groupId: data.groupId,
+          isGroup: true,
+        });
+
+        this.logger.debug(`群聊消息已发送: ${sender} -> ${data.groupId}`);
       }
     } catch (error: unknown) {
       this.logger.error(
